@@ -2,10 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function PATCH(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest) {
     const supabase = await createClient();
     const {
         data: { user },
@@ -13,12 +10,14 @@ export async function PATCH(
     if (!user)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const url = new URL(request.url);
+    const id = url.pathname.split("/").filter(Boolean).pop();
     const body = await request.json();
 
     const { data, error } = await supabase
         .from("folders")
         .update({ ...body })
-        .eq("id", params.id)
+        .eq("id", id)
         .eq("user_id", user.id)
         .select()
         .single();

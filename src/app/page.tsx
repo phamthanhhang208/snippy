@@ -172,16 +172,22 @@ export default function Home() {
             isFavorite: false,
             isPublic: false,
         };
-        setSnippets([...snippets, newSnippet]);
+        setSnippets([newSnippet, ...snippets]);
         setSelectedSnippet(newSnippet);
-        createSnippet.mutate(newSnippet);
+
+        createSnippet.mutate(newSnippet, {
+            onSuccess(data: unknown) {
+                const snippetData = data as { snippet: Snippet };
+                const returnedNewSnippet = snippetData.snippet;
+                newSnippet.id = returnedNewSnippet.id;
+            },
+        });
     };
 
     const handleUpdateSnippet = (updatedSnippet: Snippet) => {
         const updatedSnippets = snippets.map((s) =>
             s.id === updatedSnippet.id ? updatedSnippet : s
         );
-        console.log(updatedSnippet);
         setSnippets(updatedSnippets);
         setSelectedSnippet(updatedSnippet);
         updateSnippet.mutate(updatedSnippet);

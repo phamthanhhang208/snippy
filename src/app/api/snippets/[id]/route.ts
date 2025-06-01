@@ -58,10 +58,7 @@ export async function GET(
 //     return NextResponse.json({ snippet: data });
 // }
 
-export async function DELETE(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest) {
     const supabase = await createClient();
     const {
         data: { user },
@@ -69,10 +66,14 @@ export async function DELETE(
     if (!user)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    // Extract id from the URL
+    const url = new URL(request.url);
+    const id = url.pathname.split("/").filter(Boolean).pop();
+
     const { error } = await supabase
         .from("snippets")
         .delete()
-        .eq("id", params.id)
+        .eq("id", id)
         .eq("user_id", user.id);
 
     if (error)
@@ -80,16 +81,17 @@ export async function DELETE(
     return NextResponse.json({ success: true });
 }
 
-export async function PATCH(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest) {
     const supabase = await createClient();
     const {
         data: { user },
     } = await supabase.auth.getUser();
     if (!user)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Extract id from the URL
+    const url = new URL(request.url);
+    const id = url.pathname.split("/").filter(Boolean).pop();
 
     const body: UpdateSnippetBody = await request.json();
 
@@ -110,7 +112,7 @@ export async function PATCH(
         const { error } = await supabase
             .from("snippets")
             .update({ ...snippetUpdate, updated_at: new Date().toISOString() })
-            .eq("id", params.id)
+            .eq("id", id)
             .eq("user_id", user.id)
             .select()
             .single();
@@ -126,7 +128,7 @@ export async function PATCH(
         const { error: delError } = await supabase
             .from("snippet_tags")
             .delete()
-            .eq("snippet_id", params.id);
+            .eq("snippet_id", id);
 
         if (delError)
             return NextResponse.json(
@@ -137,7 +139,7 @@ export async function PATCH(
         // Insert new tags
         if (body.tags.length > 0) {
             const tagRows = body.tags.map((tag) => ({
-                snippet_id: params.id,
+                snippet_id: id,
                 tag_id: typeof tag === "string" ? tag : tag.id,
             }));
 
@@ -159,7 +161,7 @@ export async function PATCH(
             // Upsert favorite
             const { error: favError } = await supabase
                 .from("favorite_snippets")
-                .upsert({ user_id: user.id, snippet_id: params.id });
+                .upsert({ user_id: user.id, snippet_id: id });
 
             if (favError)
                 return NextResponse.json(
@@ -172,7 +174,7 @@ export async function PATCH(
                 .from("favorite_snippets")
                 .delete()
                 .eq("user_id", user.id)
-                .eq("snippet_id", params.id);
+                .eq("snippet_id", id);
 
             if (delFavError)
                 return NextResponse.json(

@@ -23,22 +23,22 @@ export async function POST(
 }
 
 // Remove from favorites
-export async function DELETE(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest) {
     const supabase = await createClient();
     const {
         data: { user },
     } = await supabase.auth.getUser();
     if (!user)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Extract id from the URL
+    const url = new URL(request.url);
+    const id = url.pathname.split("/").filter(Boolean).pop();
 
     const { error } = await supabase
         .from("favorite_snippets")
         .delete()
         .eq("user_id", user.id)
-        .eq("snippet_id", params.id);
+        .eq("snippet_id", id);
 
     if (error)
         return NextResponse.json({ error: error.message }, { status: 500 });

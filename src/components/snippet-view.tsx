@@ -58,7 +58,6 @@ export function SnippetView({
     // Update local state when the selected snippet changes
     if (snippet.id !== editedSnippet.id) {
         setEditedSnippet(snippet);
-        console.log(snippet);
     }
 
     const handleCodeChange = (code: string) => {

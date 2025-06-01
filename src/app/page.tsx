@@ -1,103 +1,406 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { Sidebar } from "@/components/sidebar";
+import { SnippetsList } from "@/components/snippets-list";
+import { SnippetView } from "@/components/snippet-view";
+import { SearchBar } from "@/components/search-bar";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import type { Snippet, Folder, Tag, User } from "@/lib/types";
+import { AuthPage } from "@/components/auth/auth-page";
+import useUser from "./hooks/useUser";
+import useListSnippetQuery from "./hooks/queries";
+import {
+    useCreateTag,
+    useDeleteTag,
+    useUpdateTag,
+} from "./hooks/tag/mutations";
+import { useQueryClient } from "@tanstack/react-query";
+import { logout } from "./login/action";
+import {
+    useCreateSnippet,
+    useDeleteSnippet,
+    useUpdateSnippet,
+} from "./hooks/snippet/mutations";
+
+import {
+    useCreateFolder,
+    useDeleteFolder,
+    useUpdateFolder,
+} from "./hooks/folder/mutation";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    const { user, loading } = useUser();
+    const queryClient = useQueryClient();
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [selectedView, setSelectedView] = useState<
+        "all" | "favorites" | "public"
+    >("all");
+    const [isLoading, setIsLoading] = useState(true);
+    const [folders, setFolders] = useState<Folder[]>([]);
+    const [snippets, setSnippets] = useState<Snippet[]>([]);
+    const [tags, setTags] = useState<Tag[]>([]);
+    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [selectedSnippet, setSelectedSnippet] = useState<Snippet | null>(
+        null
+    );
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filteredSnippets, setFilteredSnippets] = useState<Snippet[]>([]);
+    // --- queries ---
+    const {
+        data,
+        loading: isLoadingListSnippet,
+        success,
+    } = useListSnippetQuery(currentUser);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+    // -- mutation --
+
+    const createSnippet = useCreateSnippet();
+    const updateSnippet = useUpdateSnippet();
+    const deleteSnippet = useDeleteSnippet();
+
+    const createFolder = useCreateFolder();
+    const updateFolder = useUpdateFolder();
+    const deleteFolder = useDeleteFolder();
+
+    const createTag = useCreateTag();
+    const updateTag = useUpdateTag();
+    const deleteTag = useDeleteTag();
+
+    useEffect(() => {
+        if (user) {
+            setCurrentUser({
+                id: user.id,
+                email: user.email ?? "",
+                name: user.user_metadata?.name ?? user.email ?? "",
+                avatar: user.user_metadata?.avatar_url,
+            });
+        } else {
+            setCurrentUser(null);
+        }
+        setIsLoading(loading);
+    }, [user, loading]);
+
+    useEffect(() => {
+        if (!isLoadingListSnippet && success) {
+            setFolders(data.folders);
+            setSnippets(data.snippets);
+            setTags(data.tags);
+        }
+    }, [isLoadingListSnippet, success, data]);
+
+    // Filter snippets based on selected folder, view, and search query
+    useEffect(() => {
+        let filtered = snippets;
+
+        // Filter by view
+        if (selectedView === "favorites") {
+            filtered = filtered.filter((snippet) => snippet.isFavorite);
+        } else if (selectedView === "public") {
+            filtered = filtered.filter((snippet) => snippet.isPublic);
+        }
+
+        // Filter by folder
+        if (selectedFolder) {
+            filtered = filtered.filter(
+                (snippet) =>
+                    snippet.folderId === selectedFolder ||
+                    folders.find((f) => f.id === snippet.folderId)?.parentId ===
+                        selectedFolder
+            );
+        }
+
+        // Filter by tags
+        if (selectedTags.length > 0) {
+            filtered = filtered.filter((snippet) =>
+                selectedTags.every((tagId) => snippet.tags.includes(tagId))
+            );
+        }
+
+        // Filter by search query
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(
+                (snippet) =>
+                    snippet.title.toLowerCase().includes(query) ||
+                    (snippet.description &&
+                        snippet.description.toLowerCase().includes(query)) ||
+                    snippet.code.toLowerCase().includes(query) ||
+                    snippet.notes.toLowerCase().includes(query) ||
+                    snippet.tags?.some((tagId) =>
+                        tags
+                            .find((t) => t.id === tagId)
+                            ?.name.toLowerCase()
+                            .includes(query)
+                    )
+            );
+        }
+
+        setFilteredSnippets(filtered);
+
+        // Select the first snippet if none is selected
+        if (filtered.length > 0 && !selectedSnippet) {
+            setSelectedSnippet(filtered[0]);
+        } else if (filtered.length === 0) {
+            setSelectedSnippet(null);
+        }
+    }, [
+        snippets,
+        selectedFolder,
+        selectedView,
+        searchQuery,
+        folders,
+        tags,
+        selectedSnippet,
+        selectedTags,
+    ]);
+
+    const handleCreateSnippet = () => {
+        const newSnippet: Snippet = {
+            id: `snippet-${Date.now()}`,
+            title: "New Snippet",
+            code: "// Add your code here",
+            language: "javascript",
+            notes: "",
+            description: "",
+            tags: [],
+            folderId: selectedFolder || null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            isFavorite: false,
+            isPublic: false,
+        };
+        setSnippets([...snippets, newSnippet]);
+        setSelectedSnippet(newSnippet);
+        createSnippet.mutate(newSnippet);
+    };
+
+    const handleUpdateSnippet = (updatedSnippet: Snippet) => {
+        const updatedSnippets = snippets.map((s) =>
+            s.id === updatedSnippet.id ? updatedSnippet : s
+        );
+        console.log(updatedSnippet);
+        setSnippets(updatedSnippets);
+        setSelectedSnippet(updatedSnippet);
+        updateSnippet.mutate(updatedSnippet);
+    };
+
+    const handleDeleteSnippet = (id: string) => {
+        const updatedSnippets = snippets.filter((s) => s.id !== id);
+        setSnippets(updatedSnippets);
+        setSelectedSnippet(updatedSnippets[0] || null);
+        deleteSnippet.mutate(id);
+    };
+
+    const handleCreateFolder = (
+        name: string,
+        parentId: string | null = null,
+        color: string
+    ) => {
+        // Assign a random color from the available colors
+        const colors = ["blue", "yellow", "orange", "red"];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+        const newFolder: Folder = {
+            id: `folder-${Date.now()}`,
+            name,
+            parentId,
+            color: color ? color : randomColor,
+        };
+        setFolders([...folders, newFolder]);
+        createFolder.mutate(newFolder);
+    };
+
+    const handleUpdateFolder = async (
+        id: string,
+        name: string,
+        color: string,
+        parentId: string | null
+    ) => {
+        try {
+            const folder = {
+                id: id,
+                name: name,
+                color: color,
+                parentId: parentId,
+            };
+            updateFolder.mutate(folder);
+            setFolders(folders.map((f) => (f.id === id ? folder : f)));
+        } catch (error) {
+            console.error("Error updating folder:", error);
+        }
+    };
+
+    const handleDeleteFolder = (id: string) => {
+        try {
+            deleteFolder.mutate(id);
+            setFolders(folders.filter((f) => f.id !== id));
+            // Move snippets from deleted folder to root
+            const updatedSnippets = snippets.map((s) =>
+                s.folderId === id ? { ...s, folderId: null } : s
+            );
+            setSnippets(updatedSnippets);
+            if (selectedFolder === id) {
+                setSelectedFolder(null);
+            }
+        } catch (error) {
+            console.error("Error deleting folder:", error);
+        }
+    };
+
+    const handleCreateTag = (name: string) => {
+        // Assign a random color from the available colors
+        const colors = ["blue", "yellow", "orange", "red", "green", "purple"];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+        const newTag: Tag = {
+            id: `tag-${Date.now()}`,
+            name,
+            color: randomColor,
+        };
+        setTags([...tags, newTag]);
+        createTag.mutate(newTag, {
+            onSuccess: () =>
+                queryClient.invalidateQueries({ queryKey: ["tag"] }),
+        });
+        return newTag.id;
+    };
+
+    const handleUpdateTag = (id: string, name: string, color: string) => {
+        try {
+            const tag = { id: id, name: name, color: color };
+            updateTag.mutate(tag);
+            setTags(tags.map((t) => (t.id === id ? tag : t)));
+        } catch (error) {
+            console.error("Error updating tag:", error);
+        }
+    };
+
+    const handleDeleteTag = (id: string) => {
+        try {
+            deleteTag.mutate(id);
+            setTags(tags.filter((t) => t.id !== id));
+            // Remove tag from all snippets
+            const updatedSnippets = snippets.map((s) => ({
+                ...s,
+                tags: s.tags.filter((tagId) => tagId !== id),
+            }));
+            setSnippets(updatedSnippets);
+            // Remove from selected tags
+            setSelectedTags(selectedTags.filter((tagId) => tagId !== id));
+        } catch (error) {
+            console.error("Error deleting tag:", error);
+        }
+    };
+
+    const handleSelectView = (view: "all" | "favorites" | "public") => {
+        setSelectedView(view);
+        setSelectedFolder(null); // Clear folder selection when changing view
+        setSelectedTags([]);
+    };
+
+    const handleAuthSuccess = (authenticatedUser: User) => {
+        setCurrentUser(authenticatedUser);
+    };
+
+    const handleLogout = async () => {
+        logout();
+        setCurrentUser(null);
+        setFolders([]);
+        setSnippets([]);
+        setTags([]);
+        setSelectedTags([]);
+        setSelectedFolder(null);
+        setSelectedView("all");
+        setSelectedSnippet(null);
+        setSearchQuery("");
+    };
+
+    // Show loading state
+    if (isLoading) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-[#0a0d12]">
+                <div className="text-center">
+                    <div className="text-2xl font-bold mb-2">
+                        <span className="text-[#3b82f6]">S</span>nip
+                        <span className="text-[#3b82f6]">y</span>
+                    </div>
+                    <div className="text-muted-foreground">Loading...</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!currentUser) {
+        return <AuthPage onAuthSuccess={handleAuthSuccess} />;
+    }
+
+    return (
+        <main
+            className="flex h-screen overflow-hidden"
+            style={{ backgroundColor: "#0a0d12" }}
+        >
+            <Sidebar
+                folders={folders}
+                tags={tags}
+                onSelectFolder={setSelectedFolder}
+                selectedFolder={selectedFolder}
+                selectedView={selectedView}
+                selectedTags={selectedTags}
+                onSelectView={handleSelectView}
+                onSelectTags={setSelectedTags}
+                onCreateFolder={handleCreateFolder}
+                onUpdateFolder={handleUpdateFolder}
+                onDeleteFolder={handleDeleteFolder}
+                onCreateTag={handleCreateTag}
+                onUpdateTag={handleUpdateTag}
+                onDeleteTag={handleDeleteTag}
+                user={currentUser}
+                onLogout={handleLogout}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+            <div className="flex flex-col flex-1 border-l border-[#1e2330]">
+                <div className="flex items-center p-2 border-b border-[#1e2330]">
+                    <SearchBar onSearch={setSearchQuery} />
+                </div>
+                <div className="flex flex-1 overflow-hidden">
+                    <SnippetsList
+                        snippets={filteredSnippets}
+                        tags={tags}
+                        selectedSnippet={selectedSnippet}
+                        onSelectSnippet={setSelectedSnippet}
+                        onCreateSnippet={handleCreateSnippet}
+                    />
+                    {selectedSnippet ? (
+                        <SnippetView
+                            snippet={selectedSnippet}
+                            tags={tags}
+                            onUpdateSnippet={handleUpdateSnippet}
+                            onDeleteSnippet={handleDeleteSnippet}
+                        />
+                    ) : (
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className="text-center">
+                                <p className="text-muted-foreground mb-4">
+                                    No snippet selected
+                                </p>
+                                <Button onClick={handleCreateSnippet}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Create Snippet
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+            <Button
+                size="icon"
+                className="absolute bottom-6 right-6 rounded-full h-12 w-12 shadow-lg"
+                onClick={handleCreateSnippet}
+            >
+                <Plus className="h-6 w-6" />
+            </Button>
+        </main>
+    );
 }

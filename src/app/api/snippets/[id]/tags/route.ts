@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 // Add tags to a snippet
-export async function POST(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const {
         data: { user },
@@ -13,6 +10,8 @@ export async function POST(
     if (!user)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const url = new URL(request.url);
+    const id = url.pathname.split("/").filter(Boolean).pop();
     const { tagIds } = await request.json(); // expects { tagIds: string[] }
     if (!Array.isArray(tagIds) || tagIds.length === 0)
         return NextResponse.json(
@@ -22,7 +21,7 @@ export async function POST(
 
     // Prepare insert data
     const rows = tagIds.map((tagId: string) => ({
-        snippet_id: params.id,
+        snippet_id: id,
         tag_id: tagId,
     }));
 

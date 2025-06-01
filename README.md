@@ -43,7 +43,7 @@ A modern, full-stack code snippet management app built with **Next.js (App Route
 -   **snippet_tags** (join table)
 -   **favorite_snippets** (user, snippet)
 
-## ![database_schema](/supabase-schema.png)
+## ![database_schema](/public/supabase-schema.png)
 
 ## 🛠️ Scripts
 

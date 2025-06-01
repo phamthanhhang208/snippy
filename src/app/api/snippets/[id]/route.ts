@@ -17,14 +17,17 @@ type UpdateSnippetBody = {
 };
 
 export async function GET(
-    request: NextRequest,
-    { params }: { params: { id: string } }
+    request: NextRequest
+    // { params }: { params: { id: string } }
 ) {
+    const url = new URL(request.url);
+    const id = url.pathname.split("/").filter(Boolean).pop();
+
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("snippets")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", id)
         .single();
 
     if (error)

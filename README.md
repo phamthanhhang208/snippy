@@ -1,6 +1,6 @@
 # 📝 Snippy
 
-[LiveDemo]()
+[LiveDemo](https://snippy-tan.vercel.app/)
 
 A modern, full-stack code snippet management app built with **Next.js (App Router)**, **Supabase**, **React Query**, and TypeScript.
 

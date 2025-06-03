@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getRouteParam } from "@/app/api/getRouteParams";
 
 // Add tags to a snippet
 export async function POST(request: NextRequest) {
@@ -10,8 +11,14 @@ export async function POST(request: NextRequest) {
     if (!user)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const url = new URL(request.url);
-    const id = url.pathname.split("/").filter(Boolean).pop();
+    const snippetId = getRouteParam(request, "snippets");
+    if (!snippetId) {
+        return NextResponse.json(
+            { error: "Missing snippet id" },
+            { status: 400 }
+        );
+    }
+
     const { tagIds } = await request.json(); // expects { tagIds: string[] }
     if (!Array.isArray(tagIds) || tagIds.length === 0)
         return NextResponse.json(
@@ -21,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare insert data
     const rows = tagIds.map((tagId: string) => ({
-        snippet_id: id,
+        snippet_id: snippetId,
         tag_id: tagId,
     }));
 
@@ -73,8 +80,13 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Extract snippet id from the URL
-    const url = new URL(request.url);
-    const id = url.pathname.split("/").filter(Boolean).pop(); // or use a utility
+    const snippetId = getRouteParam(request, "snippets");
+    if (!snippetId) {
+        return NextResponse.json(
+            { error: "Missing snippet id" },
+            { status: 400 }
+        );
+    }
 
     const { tagId } = await request.json(); // expects { tagId: string }
     if (!tagId)
@@ -83,7 +95,7 @@ export async function DELETE(request: NextRequest) {
             { status: 400 }
         );
 
-    if (!id)
+    if (!snippetId)
         return NextResponse.json(
             { error: "Missing snippet id" },
             { status: 400 }
@@ -92,7 +104,7 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
         .from("snippet_tags")
         .delete()
-        .eq("snippet_id", id)
+        .eq("snippet_id", snippetId)
         .eq("tag_id", tagId);
 
     if (error)

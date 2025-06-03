@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getRouteParam } from "@/app/api/getRouteParams";
 
 // Mark as public/private
 export async function PATCH(request: NextRequest) {
@@ -16,14 +17,19 @@ export async function PATCH(request: NextRequest) {
             { error: "Missing isPublic boolean" },
             { status: 400 }
         );
-    // Extract id from the URL
-    const url = new URL(request.url);
-    const id = url.pathname.split("/").filter(Boolean).pop();
+
+    const snippetId = getRouteParam(request, "snippets");
+    if (!snippetId) {
+        return NextResponse.json(
+            { error: "Missing snippet id" },
+            { status: 400 }
+        );
+    }
 
     const { data, error } = await supabase
         .from("snippets")
         .update({ is_public: isPublic })
-        .eq("id", id)
+        .eq("id", snippetId)
         .eq("user_id", user.id)
         .select()
         .single();

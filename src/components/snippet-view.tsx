@@ -1,7 +1,6 @@
 "use client";
 
 import { CommandEmpty } from "@/components/ui/command";
-
 import type React from "react";
 import { useState } from "react";
 import type { Snippet, Tag } from "@/lib/types";
@@ -37,6 +36,14 @@ import {
     CommandItem,
 } from "@/components/ui/command";
 import { ChevronsUpDown } from "lucide-react";
+import {
+    useFavoriteSnippet,
+    useUnfavoriteSnippet,
+    useAddTagsToSnippet,
+    useDeleteSnippet,
+    useSetSnippetPublic,
+    useRemoveTagFromSnippet,
+} from "@/app/hooks/snippet/mutations";
 
 interface SnippetViewProps {
     snippet: Snippet;
@@ -54,6 +61,14 @@ export function SnippetView({
     const [editedSnippet, setEditedSnippet] = useState<Snippet>(snippet);
     const [activeTab, setActiveTab] = useState<string>("snippets");
     const [tagSelectorOpen, setTagSelectorOpen] = useState(false);
+
+    // --- mutation ---
+    const deleteSnippet = useDeleteSnippet();
+    const favoriteSnippet = useFavoriteSnippet();
+    const unFavoriteSnippet = useUnfavoriteSnippet();
+    const addTagToSnippet = useAddTagsToSnippet();
+    const removeTagFromSnippet = useRemoveTagFromSnippet();
+    const updateSnippetVisibilty = useSetSnippetPublic();
 
     // Update local state when the selected snippet changes
     if (snippet.id !== editedSnippet.id) {
@@ -116,6 +131,9 @@ export function SnippetView({
             isFavorite: checked,
             updatedAt: new Date().toISOString(),
         });
+        void (checked
+            ? favoriteSnippet.mutate(editedSnippet.id)
+            : unFavoriteSnippet.mutate(editedSnippet.id));
     };
 
     const handlePublicToggle = (checked: boolean) => {
@@ -123,6 +141,10 @@ export function SnippetView({
             ...editedSnippet,
             isPublic: checked,
             updatedAt: new Date().toISOString(),
+        });
+        updateSnippetVisibilty.mutate({
+            snippetId: editedSnippet.id,
+            isPublic: checked,
         });
     };
 
@@ -132,6 +154,7 @@ export function SnippetView({
 
     const handleDelete = () => {
         onDeleteSnippet(snippet.id);
+        deleteSnippet.mutate(snippet.id);
     };
 
     const handleTagToggle = (tagId: string, checked: boolean) => {
@@ -144,6 +167,18 @@ export function SnippetView({
             tags: newTags,
             updatedAt: new Date().toISOString(),
         });
+
+        if (checked) {
+            addTagToSnippet.mutate({
+                snippetId: editedSnippet.id,
+                tagIds: [tagId],
+            });
+        } else {
+            removeTagFromSnippet.mutate({
+                snippetId: editedSnippet.id,
+                tagId: tagId,
+            });
+        }
     };
 
     const handleRemoveTag = (tagId: string) => {
@@ -151,6 +186,11 @@ export function SnippetView({
             ...editedSnippet,
             tags: editedSnippet.tags.filter((id) => id !== tagId),
             updatedAt: new Date().toISOString(),
+        });
+
+        removeTagFromSnippet.mutate({
+            snippetId: editedSnippet.id,
+            tagId: tagId,
         });
     };
 

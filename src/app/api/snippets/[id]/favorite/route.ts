@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getRouteParam } from "@/app/api/getRouteParams";
 
 // Add to favorites
 export async function POST(request: NextRequest) {
@@ -9,12 +10,18 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const url = new URL(request.url);
-    const id = url.pathname.split("/").filter(Boolean).pop();
+
+    const snippetId = getRouteParam(request, "snippets");
+    if (!snippetId) {
+        return NextResponse.json(
+            { error: "Missing snippet id" },
+            { status: 400 }
+        );
+    }
 
     const { error } = await supabase
         .from("favorite_snippets")
-        .insert({ user_id: user.id, snippet_id: id });
+        .insert({ user_id: user.id, snippet_id: snippetId });
 
     if (error)
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -30,14 +37,19 @@ export async function DELETE(request: NextRequest) {
     if (!user)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     // Extract id from the URL
-    const url = new URL(request.url);
-    const id = url.pathname.split("/").filter(Boolean).pop();
+    const snippetId = getRouteParam(request, "snippets");
+    if (!snippetId) {
+        return NextResponse.json(
+            { error: "Missing snippet id" },
+            { status: 400 }
+        );
+    }
 
     const { error } = await supabase
         .from("favorite_snippets")
         .delete()
         .eq("user_id", user.id)
-        .eq("snippet_id", id);
+        .eq("snippet_id", snippetId);
 
     if (error)
         return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,7 +1,5 @@
 "use client";
-
 import type React from "react";
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +34,14 @@ export function LoginForm({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         await onLogin(email, password);
+    };
+
+    const handleSubmitDemo = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await onLogin(
+            process.env.NEXT_PUBLIC_DEMO_USER_EMAIL!,
+            process.env.NEXT_PUBLIC_DEMO_PASS!
+        );
     };
 
     return (
@@ -103,7 +109,7 @@ export function LoginForm({
 
                     <Button
                         type="submit"
-                        className="w-full"
+                        className="w-full text-white"
                         disabled={isLoading}
                     >
                         {isLoading ? (
@@ -115,6 +121,17 @@ export function LoginForm({
                             "Sign In"
                         )}
                     </Button>
+
+                    <div className="text-center text-sm">
+                        <Button
+                            type="button"
+                            disabled={isLoading}
+                            className="text-white"
+                            onClick={handleSubmitDemo}
+                        >
+                            Sign In Using Demo Account
+                        </Button>
+                    </div>
 
                     <div className="text-center text-sm">
                         <span className="text-muted-foreground">
